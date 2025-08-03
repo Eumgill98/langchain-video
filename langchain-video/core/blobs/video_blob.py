@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional, Union, List, Iterator, Literal, Dict, Any
-from pathlib import PurePath
+from typing import Optional, Union, List, Literal, Dict, Any
+from pathlib import PurePath, Path
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
 import cv2
+import ffmpeg
 
 PathLike = Union[str, PurePath]
 SamplingStrategy = Literal["uniform", "random", "first", "last", "all"]
@@ -20,9 +21,11 @@ class VideoBlob(BaseMedia):
 
     # Core data
     data: Optional[List[np.ndarray]] = None
+    audio_data: Optional[List[np.ndarray]] = None
     path: Optional[PathLike] = None
     mimetype: Optional[str] = None
 
+    # Video data
     _codec: Optional[str] = None
     _total_frames: Optional[int] = None
     _fps: Optional[float] = None
@@ -30,18 +33,25 @@ class VideoBlob(BaseMedia):
     _width: Optional[int] = None
     _duration_sec: Optional[float] = None
 
+    # Audio data
+    _audio_codec: Optional[str] = None
+    _sample_rate: Optional[int] = None
+    _audio_channels: Optional[int] = None
+    _audio_bitrate: Optional[int] = None
+    _has_audio: Optional[bool] = None
+
     @property
     def codec(self) -> Optional[str]:
         """Video codec information."""
         return self._codec
     
     @property
-    def total_frames(self) -> Optional[str]:
+    def total_frames(self) -> Optional[int]:
         """Total number of frames in the video."""
         return self._total_frames
 
     @property
-    def fps(self) -> Optional[str]:
+    def fps(self) -> Optional[float]:
         """Frames per second of the video."""
         return self._fps
     
@@ -58,7 +68,7 @@ class VideoBlob(BaseMedia):
     @property
     def duration_sec(self) -> Optional[float]:
         """Duration of the video in seconds."""
-        return self.duration_sec
+        return self._duration_sec
     
     @property
     def resolution(self) -> Optional[tuple[int, int]]:
@@ -66,15 +76,49 @@ class VideoBlob(BaseMedia):
         if self.width is not None and self.height is not None:
             return (self.width, self.height)
         return None
+    
+    @property
+    def audio_codec(self) -> Optional[str]:
+        """Audio Codec information."""
+        return self._audio_codec
+    
+    @property
+    def sample_rate(self) -> Optional[int]:
+        """Sample rate of audio"""
+        return self._sample_rate
+    
+    @property
+    def audio_channels(self) -> Optional[int]:
+        """Audio channels"""
+        return self._audio_channels
+
+    @property
+    def audio_bitrate(self) -> Optional[int]:
+        """Audio bitrate"""
+        return self._audio_bitrate
+    
+    @property
+    def has_audio(self) -> Optional[bool]:
+        """Check if video has audio"""
+        return self._has_audio
 
     def _load_video_metadata(self) -> None:
-        """Load video metatdata using OpenCV"""
+        """Load video metadata using OpenCV and audio metadata using FFmpeg"""
         if self.path is None:
             raise ValueError("Cannot load metadata: video path is not set.")
         
-        if not self.path.exists():
+        path_obj = Path(self.path)
+        if not path_obj.exists():
             raise FileNotFoundError(f"Video file not found: {self.path}")
         
+        # Load video metadata using OpenCV
+        self._load_video_metadata_opencv()
+        
+        # Load audio metadata using FFmpeg
+        self._load_audio_metadata_ffmpeg()
+
+    def _load_video_metadata_opencv(self) -> None:
+        """Load video metadata using OpenCV"""
         cap = cv2.VideoCapture(str(self.path))
         if not cap.isOpened():
             raise IOError(f"Cannot open video file: {self.path}")
@@ -93,6 +137,97 @@ class VideoBlob(BaseMedia):
             
         finally:
             cap.release()
+
+    def _load_audio_metadata_ffmpeg(self) -> None:
+        """Load audio metadata using ffmpeg-python"""
+        try:
+            probe = ffmpeg.probe(str(self.path))
+            
+            audio_streams = [
+                stream for stream in probe['streams']
+                if stream['codec_type'] == 'audio'
+            ]
+            
+            if audio_streams:
+                self._has_audio = True
+                audio_stream = audio_streams[0]
+                
+                self._audio_codec = audio_stream.get('codec_name')
+                self._sample_rate = int(audio_stream.get('sample_rate', 0)) or None
+                self._audio_channels = int(audio_stream.get('channels', 0)) or None
+                self._audio_bitrate = int(audio_stream.get('bit_rate', 0)) or None
+            else:
+                self._has_audio = False
+                self._audio_codec = None
+                self._sample_rate = None
+                self._audio_channels = None
+                self._audio_bitrate = None
+                
+        except ffmpeg.Error as e:
+            raise RuntimeError(f"FFprobe failed: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load audio metadata: {e}")
+
+    def as_audios(self, mono: bool = False) -> Optional[np.ndarray]:
+        """Extract audio data as numpy array with original sample rate.
+        
+        Args:
+            mono: Convert to mono if True
+            
+        Returns:
+            Audio data as numpy array at original sample rate:
+            - Mono: shape (n_samples,)
+            - Stereo/Multi: shape (n_samples, n_channels)
+            - None if no audio
+        """
+        if self.audio_data is not None:
+            audio = self.audio_data.copy()
+
+            if mono and audio.ndim > 1:
+                audio = np.mean(audio, axis=1)
+            
+            return audio
+        
+        if self.path is None:
+            raise ValueError("Cannot extract audio: no audio data or path available")
+        
+        if not self.has_audio:
+            return None
+
+        return self._extract_audio_from_file(mono)
+
+    def _extract_audio_from_file(self, mono: bool = False) -> Optional[np.ndarray]:
+        """Extract audio from video file using ffmpeg-python with original sample rate"""
+        try:
+            stream = ffmpeg.input(str(self.path))
+            audio = stream.audio
+            
+            options = {}
+            if mono:
+                options['ac'] = 1
+            
+            out = ffmpeg.output(
+                audio,
+                'pipe:',
+                format='f32le',
+                acodec='pcm_f32le',
+                **options
+            )
+            
+            stdout, _ = ffmpeg.run(out, pipe_stdout=True, pipe_stderr=True, quiet=True)
+            
+            audio_data = np.frombuffer(stdout, dtype=np.float32)
+
+            if not mono and self.audio_channels and self.audio_channels > 1:
+                audio_data = audio_data.reshape(-1, self.audio_channels)
+            
+            return audio_data
+            
+        except ffmpeg.Error as e:
+            error_msg = e.stderr.decode() if e.stderr else str(e)
+            raise RuntimeError(f"FFmpeg audio extraction failed: {error_msg}")
+        except Exception as e:
+            raise RuntimeError(f"Audio extraction failed: {e}")
 
     def as_frames(
         self,
@@ -115,64 +250,8 @@ class VideoBlob(BaseMedia):
             raise ValueError("Cannot extract frames: no video data or path available")
 
         frames = self._extract_frames_from_file(max_frames, sampling_strategy)
-        if sampling_strategy == "all" and max_frames is None:
-            self.data = frames
         return frames
     
-    def as_frame_iterator(
-        self,
-        batch_size: int = 10,
-        max_frames: Optional[int] = None
-    ) -> Iterator[List[np.ndarray]]:
-        """Materialize video as an iterator of frame batches for memory efficiency.
-
-        Args:
-            batch_size: Number of frames per batch
-            max_frames: Maximum total frames to process
-
-        Yields:
-            Batches of frames as lists of numpy arrays
-        """
-        if self.data is not None:
-            frames_to_process = self.data[:max_frames] if max_frames else self.data
-            
-            for i in range(0, len(frames_to_process), batch_size):
-                yield frames_to_process[i:i + batch_size]
-            return
-        
-        if self.path is None:
-            raise ValueError("Cannot iterate frames: no video data or path available")
-
-        cap = cv2.VideoCapture(str(self.path))
-        if not cap.isOpened():
-            raise IOError(f"Cannot open video file: {self.path}")
-
-        try:
-            batch = []
-            frame_count = 0
-
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-
-                batch.append(frame)
-                frame_count += 1
-
-                if len(batch) >= batch_size:
-                    yield batch
-                    batch = []
-
-                if max_frames is not None and frame_count >= max_frames:
-                    break
-
-            # Yield remaining frames
-            if batch:
-                yield batch
-
-        finally:
-            cap.release()
-
     def _extract_frames_from_file(
         self,
         max_frames: Optional[int],
@@ -260,6 +339,28 @@ class VideoBlob(BaseMedia):
         indices = self._calculate_frame_indices(len(frames), max_frames, sampling_strategy)
         return [frames[i] for i in indices]
 
+    def get_audio_info(self) -> Dict[str, Any]:
+        """Get audio information as a dictionary"""
+        return {
+            'has_audio': self.has_audio,
+            'audio_codec': self.audio_codec,
+            'sample_rate': self.sample_rate,
+            'audio_channels': self.audio_channels,
+            'audio_bitrate': self.audio_bitrate,
+            'audio_data_loaded': self.audio_data is not None
+        }
+
+    def get_video_info(self) -> Dict[str, Any]:
+        """Get video information as a dictionary"""
+        return {
+            'codec': self.codec,
+            'total_frames': self.total_frames,
+            'fps': self.fps,
+            'resolution': self.resolution,
+            'duration_sec': self.duration_sec,
+            'video_data_loaded': self.data is not None
+        }
+
     @classmethod
     def from_path(
         cls,
@@ -330,4 +431,64 @@ class VideoBlob(BaseMedia):
             _width=width,
             _duration_sec=len(frames) / fps if fps and fps > 0 else None,
         )
+    
+    @classmethod
+    def from_frames_and_audio(
+        cls,
+        frames: List[np.ndarray],
+        *,
+        mime_type: Optional[str] = None, 
+        fps: Optional[float] = None,
+        codec: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        audios: Optional[np.ndarray] = None,
+        audio_codec: Optional[str] = None,
+        sample_rate: Optional[int] = None,
+        audio_channels: Optional[int] = None,
+        audio_bitrate: Optional[int] = None,
+        has_audio: Optional[bool] = None,
+    ) -> VideoBlob:
+        """Create VideoBlob from frame data and audio data
         
+        Args:
+            frames: List of frame arrays
+            fps: Frames per second (optional)
+            codec: Video codec (optional)
+            metadata: Additional metadata
+            audios: Audio data as numpy array (optional)
+            audio_codec: Audio codec (optional)
+            sample_rate: Audio sample rate (optional)
+            audio_channels: Number of audio channels (optional)
+            audio_bitrate: Audio bitrate (optional)
+            has_audio: Whether the video has audio (optional)
+
+        Returns:
+            VideoBlob instance
+        """
+        if not frames:
+            raise ValueError("Frame list cannot be empty.")
+        
+        height, width = frames[0].shape[:2]
+
+        if audios is not None:
+            has_audio = True
+            if audio_channels is None:
+                audio_channels = 1 if audios.ndim == 1 else audios.shape[1]
+
+        return cls(
+            data=frames,
+            audio_data=audios,
+            mimetype=mime_type,
+            metadata=metadata if metadata is not None else {},
+            _total_frames=len(frames),
+            _fps=fps,
+            _codec=codec,
+            _height=height,
+            _width=width,
+            _duration_sec=len(frames) / fps if fps and fps > 0 else None,
+            _audio_codec=audio_codec,
+            _sample_rate=sample_rate,
+            _audio_channels=audio_channels,
+            _audio_bitrate=audio_bitrate,
+            _has_audio=has_audio,
+        )
