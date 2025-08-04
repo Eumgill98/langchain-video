@@ -168,7 +168,7 @@ class VideoBlob(BaseMedia):
         except Exception as e:
             raise RuntimeError(f"Failed to load audio metadata: {e}")
 
-    def as_audios(self, mono: bool = False) -> Optional[np.ndarray]:
+    def as_audios(self, mono: bool = False) -> Optional[List[np.ndarray]]:
         """Extract audio data as numpy array with original sample rate.
         
         Args:
