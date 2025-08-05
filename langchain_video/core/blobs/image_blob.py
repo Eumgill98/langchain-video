@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, Dict, Any
 from pathlib import PurePath, Path
+from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
@@ -18,42 +19,25 @@ class ImageBlob(BaseMedia):
     """
 
     # Core data
-    data: Optional[List[np.ndarray]] = None
+    data: Optional[np.ndarray] = None
     path: Optional[PathLike] = None
     mimetype: Optional[str] = None
 
     # Image data
-    _color_space: Optional[str] = None
-    _height: Optional[int] = None
-    _width: Optional[int] = None
-    _channels: Optional[int] = None
+    color_space: Optional[str] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    channels: Optional[int] = None
 
-    @property
-    def color_space(self) -> Optional[str]:
-        """Image color space"""
-        return self._color_space
-    
-    @property
-    def height(self) -> Optional[int]:
-        """Height of image"""
-        return self._height
-    
-    @property
-    def width(self) -> Optional[int]:
-        """Width of image"""
-        return self._width
-    
-    @property
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True
+    )
+
     def resolution(self) -> Optional[tuple[int, int]]:
         """Image resolution as (width, height) tuple."""
         if self.width is not None and self.height is not None:
             return (self.width, self.height)
         return None
-    
-    @property
-    def channels(self) -> Optional[int]:
-        """Channel of image"""
-        return self._channels
     
     def _load_image_metadata(self) -> None:
         """Load image metadata using OpenCV"""
@@ -68,10 +52,10 @@ class ImageBlob(BaseMedia):
         if img is None:
             raise IOError(f"Cannot read image file: {self.path}")
         
-        self._height, self._width = img.shape[:2]
-        self._channels = 1 if len(img.shape) == 2 else img.shape[2]
+        self.height, self.width = img.shape[:2]
+        self.channels = 1 if len(img.shape) == 2 else img.shape[2]
 
-        self._color_space = "BGR"
+        self.color_space = "BGR"
 
     def as_image(self) -> Optional[np.ndarray]:
         """Extract image data as numpy array
@@ -154,7 +138,7 @@ class ImageBlob(BaseMedia):
         Returns:
             ImageBlob instance
         """
-        if not image:
+        if image is None or image.size == 0:
             raise ValueError("Image cannot be empty.")
         
         height, width = image.shape[:2]
@@ -163,10 +147,10 @@ class ImageBlob(BaseMedia):
 
         return cls(
             data=image,
-            mimetypes=mime_type,
+            mimetype=mime_type,
             metadata=metadata if metadata is not None else {},
-            _height=height,
-            _width=width,
-            _color_space=color_space,
-            _channels=channels
+            height=height,
+            width=width,
+            color_space=color_space,
+            channels=channels
         )

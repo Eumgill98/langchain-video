@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Union, List, Literal, Dict, Any
 from pathlib import PurePath, Path
+from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
@@ -26,49 +27,23 @@ class VideoBlob(BaseMedia):
     mimetype: Optional[str] = None
 
     # Video data
-    _codec: Optional[str] = None
-    _total_frames: Optional[int] = None
-    _fps: Optional[float] = None
-    _height: Optional[int] = None
-    _width: Optional[int] = None
-    _duration_sec: Optional[float] = None
+    codec: Optional[str] = None
+    total_frames: Optional[int] = None
+    fps: Optional[float] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    duration_sec: Optional[float] = None
 
     # Audio data
-    _audio_codec: Optional[str] = None
-    _sample_rate: Optional[int] = None
-    _audio_channels: Optional[int] = None
-    _audio_bitrate: Optional[int] = None
-    _has_audio: Optional[bool] = None
+    audio_codec: Optional[str] = None
+    sample_rate: Optional[int] = None
+    audio_channels: Optional[int] = None
+    audio_bitrate: Optional[int] = None
+    has_audio: Optional[bool] = None
 
-    @property
-    def codec(self) -> Optional[str]:
-        """Video codec information."""
-        return self._codec
-    
-    @property
-    def total_frames(self) -> Optional[int]:
-        """Total number of frames in the video."""
-        return self._total_frames
-
-    @property
-    def fps(self) -> Optional[float]:
-        """Frames per second of the video."""
-        return self._fps
-    
-    @property
-    def height(self) -> Optional[int]:
-        """Height of video frames in pixels."""
-        return self._height
-    
-    @property
-    def width(self) -> Optional[int]:
-        """Width of video frames in pixels."""
-        return self._width
-    
-    @property
-    def duration_sec(self) -> Optional[float]:
-        """Duration of the video in seconds."""
-        return self._duration_sec
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
     
     @property
     def resolution(self) -> Optional[tuple[int, int]]:
@@ -76,31 +51,6 @@ class VideoBlob(BaseMedia):
         if self.width is not None and self.height is not None:
             return (self.width, self.height)
         return None
-    
-    @property
-    def audio_codec(self) -> Optional[str]:
-        """Audio Codec information."""
-        return self._audio_codec
-    
-    @property
-    def sample_rate(self) -> Optional[int]:
-        """Sample rate of audio"""
-        return self._sample_rate
-    
-    @property
-    def audio_channels(self) -> Optional[int]:
-        """Audio channels"""
-        return self._audio_channels
-
-    @property
-    def audio_bitrate(self) -> Optional[int]:
-        """Audio bitrate"""
-        return self._audio_bitrate
-    
-    @property
-    def has_audio(self) -> Optional[bool]:
-        """Check if video has audio"""
-        return self._has_audio
 
     def _load_video_metadata(self) -> None:
         """Load video metadata using OpenCV and audio metadata using FFmpeg"""
@@ -124,16 +74,16 @@ class VideoBlob(BaseMedia):
             raise IOError(f"Cannot open video file: {self.path}")
         
         try:
-            self._total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self._fps = cap.get(cv2.CAP_PROP_FPS)
-            self._height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self._width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.fps = cap.get(cv2.CAP_PROP_FPS)
+            self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             
-            if self._fps > 0:
-                self._duration_sec = self._total_frames / self._fps
+            if self.fps > 0:
+                self.duration_sec = self.total_frames / self.fps
             
             fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
-            self._codec = "".join([chr((fourcc >> 8 * i) & 0xFF) for i in range(4)])
+            self.codec = "".join([chr((fourcc >> 8 * i) & 0xFF) for i in range(4)])
             
         finally:
             cap.release()
@@ -149,19 +99,19 @@ class VideoBlob(BaseMedia):
             ]
             
             if audio_streams:
-                self._has_audio = True
+                self.has_audio = True
                 audio_stream = audio_streams[0]
                 
-                self._audio_codec = audio_stream.get('codec_name')
-                self._sample_rate = int(audio_stream.get('sample_rate', 0)) or None
-                self._audio_channels = int(audio_stream.get('channels', 0)) or None
-                self._audio_bitrate = int(audio_stream.get('bit_rate', 0)) or None
+                self.audio_codec = audio_stream.get('codec_name')
+                self.sample_rate = int(audio_stream.get('sample_rate', 0)) or None
+                self.audio_channels = int(audio_stream.get('channels', 0)) or None
+                self.audio_bitrate = int(audio_stream.get('bit_rate', 0)) or None
             else:
-                self._has_audio = False
-                self._audio_codec = None
-                self._sample_rate = None
-                self._audio_channels = None
-                self._audio_bitrate = None
+                self.has_audio = False
+                self.audio_codec = None
+                self.sample_rate = None
+                self.audio_channels = None
+                self.audio_bitrate = None
                 
         except ffmpeg.Error as e:
             raise RuntimeError(f"FFprobe failed: {e}")
@@ -424,12 +374,12 @@ class VideoBlob(BaseMedia):
             data=frames,
             mimetype=mime_type,
             metadata=metadata if metadata is not None else {},
-            _total_frames=len(frames),
-            _fps=fps,
-            _codec=codec,
-            _height=height,
-            _width=width,
-            _duration_sec=len(frames) / fps if fps and fps > 0 else None,
+            total_frames=len(frames),
+            fps=fps,
+            codec=codec,
+            height=height,
+            width=width,
+            duration_sec=len(frames) / fps if fps and fps > 0 else None,
         )
     
     @classmethod
@@ -480,15 +430,15 @@ class VideoBlob(BaseMedia):
             audio_data=audios,
             mimetype=mime_type,
             metadata=metadata if metadata is not None else {},
-            _total_frames=len(frames),
-            _fps=fps,
-            _codec=codec,
-            _height=height,
-            _width=width,
-            _duration_sec=len(frames) / fps if fps and fps > 0 else None,
-            _audio_codec=audio_codec,
-            _sample_rate=sample_rate,
-            _audio_channels=audio_channels,
-            _audio_bitrate=audio_bitrate,
-            _has_audio=has_audio,
+            total_frames=len(frames),
+            fps=fps,
+            codec=codec,
+            height=height,
+            width=width,
+            duration_sec=len(frames) / fps if fps and fps > 0 else None,
+            audio_codec=audio_codec,
+            sample_rate=sample_rate,
+            audio_channels=audio_channels,
+            audio_bitrate=audio_bitrate,
+            has_audio=has_audio,
         )

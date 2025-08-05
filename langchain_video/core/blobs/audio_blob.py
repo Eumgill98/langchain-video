@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional, Union, List, Literal, Dict, Any
+from typing import Optional, Union, Dict, Any
 from pathlib import PurePath, Path
+from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
@@ -23,49 +24,18 @@ class AudioBlob(BaseMedia):
     mimetype: Optional[str] = None
 
     # Audio data
-    _codec: Optional[str] = None
-    _sample_rate: Optional[int] = None
-    _channels: Optional[int] = None
-    _bitrate: Optional[int] = None
-    _duration_sec: Optional[float] = None
-    _total_samples: Optional[int] = None
-    _bit_depth: Optional[int] = None
+    codec: Optional[str] = None
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    bitrate: Optional[int] = None
+    duration_sec: Optional[float] = None
+    total_samples: Optional[int] = None
+    bit_depth: Optional[int] = None
 
-    @property
-    def codec(self) -> Optional[str]:
-        """Audio codec information."""
-        return self._codec
-    
-    @property
-    def sample_rate(self) -> Optional[int]:
-        """Sample rate of the audio in Hz."""
-        return self._sample_rate
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
-    @property
-    def channels(self) -> Optional[int]:
-        """Number of audio channels."""
-        return self._channels
-    
-    @property
-    def bitrate(self) -> Optional[int]:
-        """Bitrate of the audio in bits per second."""
-        return self._bitrate
-    
-    @property
-    def duration_sec(self) -> Optional[float]:
-        """Duration of the audio in seconds."""
-        return self._duration_sec
-    
-    @property
-    def total_samples(self) -> Optional[int]:
-        """Total number of audio samples."""
-        return self._total_samples
-    
-    @property
-    def bit_depth(self) -> Optional[int]:
-        """Bit depth of the audio."""
-        return self._bit_depth
-    
     @property
     def is_mono(self) -> Optional[bool]:
         """Check if audio is mono."""
@@ -87,12 +57,12 @@ class AudioBlob(BaseMedia):
         try:
             info = sf.info(str(self.path))
             
-            self._sample_rate = info.samplerate
-            self._channels = info.channels
-            self._total_samples = info.frames
-            self._duration_sec = info.duration
-            self._codec = info.format
-            self._bit_depth = getattr(info.subtype_info, 'bits_per_sample', None)
+            self.sample_rate = info.samplerate
+            self.channels = info.channels
+            self.total_samples = info.frames
+            self.duration_sec = info.duration
+            self.codec = info.format
+            self.bit_depth = getattr(info.subtype_info, 'bits_per_sample', None)
             
         except Exception as e:
             raise RuntimeError(f"Failed to load audio metadata: {e}")
@@ -208,6 +178,9 @@ class AudioBlob(BaseMedia):
         Returns:
             AudioBlob instance
         """
+        if audio is None:
+            raise ValueError("Audio cannot be empty.")
+
         if audio.ndim == 0 or (audio.ndim > 2):
             raise ValueError("Audio data must be 1D (mono) or 2D (multi-channel)")
         
@@ -222,10 +195,10 @@ class AudioBlob(BaseMedia):
             data=audio,
             mimetype=mime_type,
             metadata=metadata if metadata is not None else {},
-            _sample_rate=sample_rate,
-            _channels=channels,
-            _codec=codec,
-            _bitrate=bitrate,
-            _total_samples=total_samples,
-            _duration_sec=duration_sec,
+            sample_rate=sample_rate,
+            channels=channels,
+            codec=codec,
+            bitrate=bitrate,
+            total_samples=total_samples,
+            duration_sec=duration_sec,
         )
