@@ -1,14 +1,14 @@
 from __future__ import annotations
+from .base import PathLike
 
-from typing import Optional, Union, Dict, Any
-from pathlib import PurePath, Path
+from typing import Optional, Dict, Any
+from pathlib import Path
 from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
+
 import numpy as np
 import mimetypes
 import soundfile as sf
-
-PathLike = Union[str, PurePath]
 
 class AudioBlob(BaseMedia):
     """AudioBlob represents raw audio data by either reference or value.

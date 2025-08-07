@@ -1,16 +1,14 @@
 from __future__ import annotations
+from .base import PathLike, SamplingStrategy
 
-from typing import Optional, Union, List, Literal, Dict, Any
-from pathlib import PurePath, Path
+from typing import Optional, List, Dict, Any
+from pathlib import Path
 from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
 import cv2
 import ffmpeg
-
-PathLike = Union[str, PurePath]
-SamplingStrategy = Literal["uniform", "random", "first", "last", "all"]
 
 class VideoBlob(BaseMedia):
     """VideoBlob represents raw video data by either reference or value.
