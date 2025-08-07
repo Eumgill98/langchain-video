@@ -1,14 +1,13 @@
 from __future__ import annotations
+from .base import PathLike
 
-from typing import Optional, Union, Dict, Any
-from pathlib import PurePath, Path
+from typing import Optional, Dict, Any
+from pathlib import Path
 from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
 import numpy as np
 import mimetypes
 import cv2
-
-PathLike = Union[str, PurePath]
 
 class ImageBlob(BaseMedia):
     """ImageBlob represents raw image data by either reference or value.
