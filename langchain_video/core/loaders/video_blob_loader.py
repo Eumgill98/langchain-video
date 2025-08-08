@@ -3,11 +3,9 @@ from .base import BaseMultiModalBlobLoader
 
 from langchain_video.core.blobs import VideoBlob, PathLike
 
-from typing import Union, List, Optional, TYPE_CHECKING
+from typing import Union, List, Optional
 from pathlib import Path
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
+from collections.abc import Iterable
 
 class VideoBlobLoader(BaseMultiModalBlobLoader):
     """Video blob loader implementation."""
