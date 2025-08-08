@@ -126,8 +126,7 @@ class ImageBlob(BaseMedia):
         image: np.ndarray,
         *,
         mime_type: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        path: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> ImageBlob:
         """Create ImageBlob from image data
 
@@ -152,6 +151,5 @@ class ImageBlob(BaseMedia):
             height=height,
             width=width,
             color_space=color_space,
-            channels=channels,
-            path=path
+            channels=channels
         )
