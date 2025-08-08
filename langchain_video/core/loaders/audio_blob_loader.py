@@ -5,9 +5,7 @@ from langchain_video.core.blobs import AudioBlob, PathLike
 
 from typing import Union, List, Optional
 from pathlib import Path
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
+from collections.abc import Iterable
 
 class AudioBlobLoader(BaseMultiModalBlobLoader):
     """Audio blob loader implementation."""
