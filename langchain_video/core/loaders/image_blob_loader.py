@@ -5,7 +5,9 @@ from langchain_video.core.blobs import ImageBlob, PathLike
 
 from typing import Union, List, Optional
 from pathlib import Path
-from collections.abc import Iterable
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 class ImageBlobLoader(BaseMultiModalBlobLoader):
     """Image blob loader implemetation."""

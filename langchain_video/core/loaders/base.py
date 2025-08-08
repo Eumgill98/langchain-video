@@ -5,7 +5,9 @@ from typing import Union, List
 from pathlib import Path
 
 from langchain_video.core.blobs import VideoBlob, ImageBlob, AudioBlob, PathLike
-from collections.abc import Iterable
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 MultiModalBlob = Union[VideoBlob, ImageBlob, AudioBlob]
 
