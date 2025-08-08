@@ -3,7 +3,7 @@ from .base import BaseMultiModalBlobLoader
 
 from langchain_video.core.blobs import VideoBlob, PathLike
 
-from typing import Union, List, Optional
+from typing import Union, List, Optional, TYPE_CHECKING
 from pathlib import Path
 
 if TYPE_CHECKING:
