@@ -50,6 +50,6 @@ class AudioBlobSpliter(BaseMultiModalBlobTransformer):
                 start += self._chunk_size - self._chunk_overlap
         return result
     
-    def transform_blobs(self, blobs: Sequence[AudioBlob], **kwargs) -> Sequence[Audio]:
+    def transform_blobs(self, blobs: Sequence[AudioBlob], **kwargs) -> Sequence[AudioBlob]:
         """Transform sequence of blobs by splitting them."""
         return self.split_blobs(list(blobs))
