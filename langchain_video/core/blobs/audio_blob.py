@@ -22,6 +22,7 @@ class AudioBlob(BaseMedia):
     data: Optional[np.ndarray] = None
     path: Optional[PathLike] = None
     mimetype: Optional[str] = None
+    subclip: bool = False
 
     # Audio data
     codec: Optional[str] = None
@@ -31,6 +32,8 @@ class AudioBlob(BaseMedia):
     duration_sec: Optional[float] = None
     total_samples: Optional[int] = None
     bit_depth: Optional[int] = None
+    start_sample: Optional[int] = None
+    end_sample: Optional[int] = None
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -89,6 +92,9 @@ class AudioBlob(BaseMedia):
         if self.path is None:
             raise ValueError("Cannot extract audio: no audio data or path available")
 
+        if self.subclip:
+            return self._extract_audio_from_file(mono)[self.start_sample:self.end_sample]
+
         return self._extract_audio_from_file(mono)
     
     def _extract_audio_from_file(self, mono: bool = False) -> np.ndarray:
@@ -116,7 +122,9 @@ class AudioBlob(BaseMedia):
             'bit_depth': self.bit_depth,
             'is_mono': self.is_mono,
             'is_stereo': self.is_stereo,
-            'audio_data_loaded': self.data is not None
+            'audio_data_loaded': self.data is not None,
+            'start_sample': self.start_sample,
+            'end_sample': self.end_sample,
         }
     
     def _sec2sample(self, sec: float) -> int:
@@ -144,21 +152,31 @@ class AudioBlob(BaseMedia):
         if self.sample_rate is None:
             raise ValueError("sampe rate is required to use time-based slicing.")
         
-        audio = self.data if self.data is not None else self.as_audio()
-
         start_sample = self._sec2sample(start_sec)
         end_sample = self._sec2sample(end_sec)
 
-        return AudioBlob.from_audio(
-            audio=audio[start_sample:end_sample],
-            sample_rate=self.sample_rate,
-            mime_type=self.mimetype,
-            codec=self.codec,
-            bitrate=self.bitrate,
-            bit_depth=self.bit_depth,
-            metadata=self.metadata,
-            path=self.path
-        )
+        if self.data is None:
+            return AudioBlob.from_path(
+                path=self.path,
+                mime_type=self.mimetype,
+                metadata=self.metadata,
+                subclip=self.subclip,
+                start_sample=start_sample,
+                end_sample=end_sample
+            )
+
+        else:
+            audio = self.as_audio()[start_sample:end_sample]
+            return AudioBlob.from_audio(
+                audio=audio,
+                sample_rate=self.sample_rate,
+                mime_type=self.mimetype,
+                codec=self.codec,
+                bitrate=self.bitrate,
+                bit_depth=self.bit_depth,
+                metadata=self.metadata,
+                path=self.path
+            )
     
     def get_audio_subclip_by_sample(
         self,
@@ -176,19 +194,29 @@ class AudioBlob(BaseMedia):
         Returns:
             AudioBlob: New instance with sliced audio data
         """
-        audio = self.data if self.data is not None else self.as_audio()
+        if self.data is None:
+            return AudioBlob.from_path(
+                path=self.path,
+                mime_type=self.mimetype,
+                metadata=self.metadata,
+                subclip=self.subclip,
+                start_sample=start_sample,
+                end_sample=end_sample
+            )
 
-        return AudioBlob.from_audio(
-            audio=audio[start_sample:end_sample],
-            sample_rate=self.sample_rate,
-            mime_type=self.mimetype,
-            codec=self.codec,
-            bitrate=self.bitrate,
-            bit_depth=self.bit_depth,
-            metadata=self.metadata,
-            path=self.path
-        )
-
+        else:
+            audio = self.as_audio()[start_sample:end_sample]
+            return AudioBlob.from_audio(
+                audio=audio,
+                sample_rate=self.sample_rate,
+                mime_type=self.mimetype,
+                codec=self.codec,
+                bitrate=self.bitrate,
+                bit_depth=self.bit_depth,
+                metadata=self.metadata,
+                path=self.path
+            )
+        
     @classmethod
     def from_path(
         cls,
@@ -196,7 +224,10 @@ class AudioBlob(BaseMedia):
         *,
         mime_type: Optional[str] = None,
         guess_type: bool = True,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        subclip: bool = False,
+        start_sample: Optional[int] = None,
+        end_sample: Optional[int] = None,
     ) -> AudioBlob:
         """Create AudioBlob from file path.
         
@@ -222,6 +253,17 @@ class AudioBlob(BaseMedia):
             metadata=metadata if metadata is not None else {},
         )
         instance._load_audio_metadata()
+
+        if subclip:
+            instance.start_sample = start_sample
+            instance.end_sample = end_sample
+            instance.total_samples = end_sample - start_sample
+
+            if instance.sample_rate is not None:
+                instance.duration_sec = instance.total_samples / instance.sample_rate
+            else:
+                instance.duration_sec = None
+
         return instance
     
     @classmethod

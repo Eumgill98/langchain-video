@@ -23,6 +23,7 @@ class VideoBlob(BaseMedia):
     audio_data: Optional[List[np.ndarray]] = None
     path: Optional[PathLike] = None
     mimetype: Optional[str] = None
+    subclip: bool = False
 
     # Video data
     codec: Optional[str] = None
@@ -31,6 +32,8 @@ class VideoBlob(BaseMedia):
     height: Optional[int] = None
     width: Optional[int] = None
     duration_sec: Optional[float] = None
+    start_frame: Optional[int] = None
+    end_frame: Optional[int] = None
 
     # Audio data
     audio_codec: Optional[str] = None
@@ -38,6 +41,9 @@ class VideoBlob(BaseMedia):
     audio_channels: Optional[int] = None
     audio_bitrate: Optional[int] = None
     has_audio: Optional[bool] = None
+    total_samples: Optional[int] = None
+    start_sample: Optional[int] = None
+    end_sample: Optional[int] = None
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -76,6 +82,8 @@ class VideoBlob(BaseMedia):
             self.fps = cap.get(cv2.CAP_PROP_FPS)
             self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.start_frame = 0
+            self.end_frame = self.total_frames
             
             if self.fps > 0:
                 self.duration_sec = self.total_frames / self.fps
@@ -99,17 +107,23 @@ class VideoBlob(BaseMedia):
             if audio_streams:
                 self.has_audio = True
                 audio_stream = audio_streams[0]
-                
+
                 self.audio_codec = audio_stream.get('codec_name')
                 self.sample_rate = int(audio_stream.get('sample_rate', 0)) or None
                 self.audio_channels = int(audio_stream.get('channels', 0)) or None
                 self.audio_bitrate = int(audio_stream.get('bit_rate', 0)) or None
-            else:
-                self.has_audio = False
-                self.audio_codec = None
-                self.sample_rate = None
-                self.audio_channels = None
-                self.audio_bitrate = None
+                
+                if self.duration_sec is None:
+                    try:
+                        if 'duration' in audio_stream and audio_stream['duration'] != 'N/A':
+                            duration = float(audio_stream['duration'])
+                        elif 'format' in probe and 'duration' in probe['format'] and probe['format']['duration'] != 'N/A':
+                            duration = float(probe['format']['duration'])
+                    except ValueError:
+                        duration = None
+                    self.duration_sec = duration
+
+                self.total_samples = int(self.sample_rate * self.duration_sec) if self.sample_rate and self.duration_sec else None
                 
         except ffmpeg.Error as e:
             raise RuntimeError(f"FFprobe failed: {e}")
@@ -141,6 +155,9 @@ class VideoBlob(BaseMedia):
         
         if not self.has_audio:
             return None
+
+        if self.subclip:
+            return self._extract_audio_from_file(mono)[self.start_sample:self.end_sample]
 
         return self._extract_audio_from_file(mono)
 
@@ -198,6 +215,10 @@ class VideoBlob(BaseMedia):
             raise ValueError("Cannot extract frames: no video data or path available")
 
         frames = self._extract_frames_from_file(max_frames, sampling_strategy)
+        
+        if self.subclip:
+            return frames[self.start_frame:self.end_frame]
+        
         return frames
     
     def _extract_frames_from_file(
@@ -295,7 +316,11 @@ class VideoBlob(BaseMedia):
             'sample_rate': self.sample_rate,
             'audio_channels': self.audio_channels,
             'audio_bitrate': self.audio_bitrate,
-            'audio_data_loaded': self.audio_data is not None
+            'audio_data_loaded': self.audio_data is not None,
+            'start_sample': self.start_sample,
+            'end_sample': self.end_sample,
+            'total_samples': self.total_samples,
+            'durations': self.duration_sec
         }
 
     def get_video_info(self) -> Dict[str, Any]:
@@ -306,7 +331,9 @@ class VideoBlob(BaseMedia):
             'fps': self.fps,
             'resolution': self.resolution,
             'duration_sec': self.duration_sec,
-            'video_data_loaded': self.data is not None
+            'video_data_loaded': self.data is not None,
+            'start_frame': self.start_frame,
+            'end_frame': self.end_frame,
         }
     
     def get_duration(self) -> Optional[float]:
@@ -334,29 +361,45 @@ class VideoBlob(BaseMedia):
         if self.fps is None:
             raise ValueError("FPS is required to extract frame subclip by time.")
         
-        frames = self.data if self.data is not None else self.as_frames()
-        
         start_frame = int(start_sec * self.fps)
         end_frame = int(end_sec * self.fps)
 
-        # extract audio data 
-        audios = self._get_audio_subclip(start_sec, end_sec)
+        if self.has_audio and self.sample_rate is not None:
+            start_sample, end_sample = int(self.sample_rate * start_sec), int(self.sample_rate * end_sec)
+        else:
+            start_sample, end_sample = None, None
+
+        if self.data is None:
+            return VideoBlob.from_path(
+                path=self.path,
+                mime_type=self.mimetype,
+                metadata=self.metadata,
+                subclip=True,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                start_sample=start_sample,
+                end_sample=end_sample
+            )
+
+        else:
+            frames = self.as_frames()[start_frame:end_frame]
+            audios = self._get_audio_subclip(start_sec, end_sec)
+            
+            return VideoBlob.from_frames_and_audio(
+                frames=frames,
+                mime_type=self.mimetype,
+                fps=self.fps,
+                codec=self.codec,
+                metadata=self.metadata,
+                path=self.path,
+                audios=audios,
+                audio_codec=self.audio_codec,
+                sample_rate=self.sample_rate,
+                audio_channels=self.audio_channels,
+                audio_bitrate=self.audio_bitrate,
+                has_audio=self.has_audio,
+            )
         
-        return VideoBlob.from_frames_and_audio(
-            frames=frames[start_frame:end_frame],
-            mime_type=self.mimetype,
-            fps=self.fps,
-            codec=self.codec,
-            metadata=self.metadata,
-            path=self.path,
-            audios=audios,
-            audio_codec=self.audio_codec,
-            sample_rate=self.sample_rate,
-            audio_channels=self.audio_channels,
-            audio_bitrate=self.audio_bitrate,
-            has_audio=self.has_audio,
-        )
-    
     def get_frame_subclip_by_frame(
         self,
         start_frame: int,
@@ -368,9 +411,25 @@ class VideoBlob(BaseMedia):
         Returns:
             new VideoBlob
         """
-        frames = self.data if self.data is not None else self.as_frames()
 
-        # extract audios
+        if self.has_audio and self.sample_rate is not None:
+            start_sample, end_sample = int(self.sample_rate * self._frame2sec(start_frame)), int(self.sample_rate * self._frame2sec(end_frame))
+        else:
+            start_sample, end_sample = None, None
+
+        if self.data is None:
+            return VideoBlob.from_path(
+                path=self.path,
+                mime_type=self.mime_type,
+                metadata=self.metadata,
+                subclip=True,
+                start_frame=start_frame,
+                end_frame=end_frame,
+                start_sample=start_sample,
+                end_sample=end_sample
+            )
+
+        frames = self.data if self.data is not None else self.as_frames()
         audios = self._get_audio_subclip(self._frame2sec(start_frame), self._frame2sec(end_frame))
 
         return VideoBlob.from_frames_and_audio(
@@ -421,7 +480,12 @@ class VideoBlob(BaseMedia):
         *,
         mime_type: Optional[str] = None,
         guess_type: bool = True,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        subclip:bool = False,
+        start_frame: Optional[int] = None,
+        end_frame: Optional[int] = None,
+        start_sample: Optional[int] = None,
+        end_sample: Optional[int] = None,
     ) -> VideoBlob:
         """Create VideoBlob from file path.
         
@@ -446,6 +510,23 @@ class VideoBlob(BaseMedia):
             metadata=metadata if metadata is not None else {},
         )
         instance._load_video_metadata()
+
+        if (subclip):
+            instance.start_frame = start_frame
+            instance.end_frame = end_frame
+            instance.total_frames = end_frame - start_frame
+
+            instance.start_sample = start_sample
+            instance.end_sample = end_sample
+            instance.total_samples = end_sample - start_sample
+            
+            if instance.fps and instance.total_frames:
+                instance.duration_sec = instance.total_frames / instance.fps
+            else:
+                instance.duration_sec = None
+
+            instance.subclip = True
+
         return instance
 
     @classmethod
