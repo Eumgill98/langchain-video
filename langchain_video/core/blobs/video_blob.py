@@ -420,7 +420,7 @@ class VideoBlob(BaseMedia):
         if self.data is None:
             return VideoBlob.from_path(
                 path=self.path,
-                mime_type=self.mime_type,
+                mime_type=self.mimetype,
                 metadata=self.metadata,
                 subclip=True,
                 start_frame=start_frame,

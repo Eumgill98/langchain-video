@@ -160,7 +160,7 @@ class AudioBlob(BaseMedia):
                 path=self.path,
                 mime_type=self.mimetype,
                 metadata=self.metadata,
-                subclip=self.subclip,
+                subclip=True,
                 start_sample=start_sample,
                 end_sample=end_sample
             )
@@ -199,7 +199,7 @@ class AudioBlob(BaseMedia):
                 path=self.path,
                 mime_type=self.mimetype,
                 metadata=self.metadata,
-                subclip=self.subclip,
+                subclip=True,
                 start_sample=start_sample,
                 end_sample=end_sample
             )
@@ -255,6 +255,7 @@ class AudioBlob(BaseMedia):
         instance._load_audio_metadata()
 
         if subclip:
+            instance.subclip = subclip
             instance.start_sample = start_sample
             instance.end_sample = end_sample
             instance.total_samples = end_sample - start_sample

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List
 from collections.abc import Sequence, Iterable
+from tqdm import tqdm
 from .base import BaseMultiModalBlobTransformer
 from langchain_video.core.blobs import AudioBlob
 
@@ -9,8 +10,8 @@ class AudioBlobSpliter(BaseMultiModalBlobTransformer):
     """AudioBlob Spliter"""
     def __init__(
         self,
-        chunk_size: int = 100,
-        chunk_overlap: int = 20,
+        chunk_size: int = 10000,
+        chunk_overlap: int = 2000,
     ):
         if chunk_size <= 0:
             raise ValueError(f"chunk_size must be > 0, got {chunk_size}")
@@ -22,19 +23,21 @@ class AudioBlobSpliter(BaseMultiModalBlobTransformer):
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
     
-    def split_blobs(self, blobs: Iterable[AudioBlob]) -> List[AudioBlob]:
+    def split_blobs(self, blobs: Iterable[AudioBlob], verbose: bool = False) -> List[AudioBlob]:
         """
         Split each AudioBlob in the iterable into smaller Audio chunks based on sample ranges.
 
         Args:
             blobs (Iterable[AudioBlob]): An iterable of AudioBlob instances to be split.
+            verbose (bool): visualization of progress.
 
         Returns:
             List[AudioBlob]: A list of AudioBlob chunks, each containing a subset of samples from the originals,
                             with optional overlapping samples between chunks as specified by chunk_size and chunk_overlap.
         """
         result: List[AudioBlob] = []
-        for blob in blobs:
+        iterator = tqdm(blobs, desc="Splitting AudioBlobs") if verbose else blobs
+        for blob in iterator:
             total_samples = blob.total_samples
 
             start = 0
@@ -52,4 +55,6 @@ class AudioBlobSpliter(BaseMultiModalBlobTransformer):
     
     def transform_blobs(self, blobs: Sequence[AudioBlob], **kwargs) -> Sequence[AudioBlob]:
         """Transform sequence of blobs by splitting them."""
-        return self.split_blobs(list(blobs))
+        if isinstance(blobs, AudioBlob):
+            blobs = [blobs]
+        return self.split_blobs(list(blobs), **kwargs)

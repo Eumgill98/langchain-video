@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod, Any
+from abc import ABC, abstractmethod
+from typing import Any
 from collections.abc import Sequence
 from langchain_video.core.loaders.base import MultiModalBlob 
 from langchain_core.runnables.config import run_in_executor
