@@ -21,7 +21,15 @@ class BaseMultiModalBlobLoader(ABC):
         paths: Union[PathLike, List[Union[str, Path]]],
     ) -> List[Path]:
         """Convert input path(s) to a list of pathlib.Path objects."""
-        return [p if isinstance[p, Path] else Path(p) for p in paths]
+        return [p if isinstance(p, Path) else Path(p) for p in paths]
+
+    def __iter__(self):
+        """Make directly iterable."""
+        return self.yield_blobs()
+    
+    def __getitem__(self, index):
+        blobs = list(self.yield_blobs())
+        return blobs[index]
 
     @abstractmethod
     def yield_blobs(
