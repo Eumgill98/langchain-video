@@ -160,7 +160,8 @@ class VideoBlob(BaseMedia):
             return self._extract_audio_from_file(mono)[self.start_sample:self.end_sample]
 
         return self._extract_audio_from_file(mono)
-
+    
+    
     def _extract_audio_from_file(self, mono: bool = False) -> Optional[np.ndarray]:
         """Extract audio from video file using ffmpeg-python with original sample rate"""
         try:
@@ -214,13 +215,35 @@ class VideoBlob(BaseMedia):
         if self.path is None:
             raise ValueError("Cannot extract frames: no video data or path available")
 
-        frames = self._extract_frames_from_file(max_frames, sampling_strategy)
-        
         if self.subclip:
-            return frames[self.start_frame:self.end_frame]
-        
+            frames = self._extract_frame_from_slicing(self.start_frame, self.end_frame)
+        else:
+            frames = self._extract_frames_from_file(max_frames, sampling_strategy)
         return frames
     
+    def _extract_frame_from_slicing(
+        self,
+        start_frame: int,
+        end_frame: int
+    ) -> List[np.ndarray]:
+        """Extract frames from video file based on slicing frame index."""
+        cap = cv2.VideoCapture(str(self.path))
+        if not cap.isOpened():
+            raise IOError(f"Cannot open video file: {self.path}")
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        ret, frame = cap.read()
+        if ret:
+            frames = [frame]
+        else:
+            frames = []
+        for _ in range(start_frame + 1, end_frame):
+            ret, frame = cap.read()
+            if ret:
+                frames.append(frame)
+        cap.release()
+        return frames
+
     def _extract_frames_from_file(
         self,
         max_frames: Optional[int],
