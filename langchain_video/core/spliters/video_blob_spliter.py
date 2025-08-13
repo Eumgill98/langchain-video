@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List
 from collections.abc import Sequence, Iterable
+from tqdm import tqdm
 from .base import BaseMultiModalBlobTransformer
 from langchain_video.core.blobs import VideoBlob
 
@@ -22,19 +23,21 @@ class VideoBlobSpliter(BaseMultiModalBlobTransformer):
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
 
-    def split_blobs(self, blobs: Iterable[VideoBlob]) -> List[VideoBlob]:
+    def split_blobs(self, blobs: Iterable[VideoBlob], verbose: bool = False) -> List[VideoBlob]:
         """
         Split each VideoBlob in the iterable into smaller VideoBlob chunks based on frame ranges.
 
         Args:
             blobs (Iterable[VideoBlob]): An iterable of VideoBlob instances to be split.
+            verbose (bool): visualization of progress.
 
         Returns:
             List[VideoBlob]: A list of VideoBlob chunks, each containing a subset of frames from the originals,
                             with optional overlapping frames between chunks as specified by chunk_size and chunk_overlap.
         """
         result: List[VideoBlob] = []
-        for blob in blobs:
+        iterator = tqdm(blobs, desc="Splitting VideoBlobs") if verbose else blobs
+        for blob in iterator:
             total_frames = blob.total_frames
 
             start = 0
@@ -52,4 +55,6 @@ class VideoBlobSpliter(BaseMultiModalBlobTransformer):
 
     def transform_blobs(self, blobs: Sequence[VideoBlob], **kwargs) -> Sequence[VideoBlob]:
         """Transform sequence of blobs by splitting them."""
-        return self.split_blobs(list(blobs))
+        if isinstance(blobs, VideoBlob):
+            blobs = [blobs]
+        return self.split_blobs(list(blobs), **kwargs)
