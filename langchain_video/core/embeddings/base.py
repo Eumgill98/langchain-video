@@ -1,8 +1,6 @@
 """Interface for embedding models."""
 from abc import ABC, abstractmethod
-from typing import List
-
-import numpy as np
+from typing import List, Any
 
 from langchain_core.runnables.config import run_in_executor
 
@@ -107,7 +105,7 @@ class ImageEmbeddings(ABC):
     """
 
     @abstractmethod
-    def embed_images(self, images: List[np.ndarray]) -> List[List[float]]:
+    def embed_images(self, images: List[Any]) -> List[List[float]]:
         """Embed multiple images.
 
         Args:
@@ -118,7 +116,7 @@ class ImageEmbeddings(ABC):
         """
 
     @abstractmethod
-    def embed_query_image(self, image: np.ndarray) -> List[float]:
+    def embed_query_image(self, image: Any) -> List[float]:
         """Embed query image.
 
         Args:
@@ -128,7 +126,7 @@ class ImageEmbeddings(ABC):
             Embedding.
         """
     
-    async def aembed_images(self, images: List[np.ndarray]) -> List[List[float]]:
+    async def aembed_images(self, images: List[Any]) -> List[List[float]]:
         """Asynchronous Embed multiple images.
 
         Args:
@@ -139,7 +137,7 @@ class ImageEmbeddings(ABC):
         """
         return await run_in_executor(None, self.embed_images, images)
 
-    async def aembed_query_image(self, image: np.ndarray) -> List[float]:
+    async def aembed_query_image(self, image: Any) -> List[float]:
         """Asynchronous Embed query image.
 
         Args:
@@ -179,7 +177,7 @@ class AudioEmbeddings(ABC):
     """
 
     @abstractmethod
-    def embed_audios(self, audios: List[np.ndarray]) -> List[List[float]]:
+    def embed_audios(self, audios: List[Any]) -> List[List[float]]:
         """Embed multiple audios.
 
         Args:
@@ -190,7 +188,7 @@ class AudioEmbeddings(ABC):
         """
 
     @abstractmethod
-    def embed_query_audio(self, audio: np.ndarray) -> List[float]:
+    def embed_query_audio(self, audio: Any) -> List[float]:
         """Embed query audio.
 
         Args:
@@ -200,7 +198,7 @@ class AudioEmbeddings(ABC):
             Embedding.
         """
 
-    async def aembed_audios(self, audios: List[np.ndarray]) -> List[List[float]]:
+    async def aembed_audios(self, audios: List[Any]) -> List[List[float]]:
         """Asynchronous Embed multiple audios.
 
         Args:
@@ -211,7 +209,7 @@ class AudioEmbeddings(ABC):
         """
         return await run_in_executor(None, self.embed_audios, audios)
 
-    async def aembed_query_audio(self, audio: np.ndarray) -> List[float]:
+    async def aembed_query_audio(self, audio: Any) -> List[float]:
         """Asynchronous Embed query audio.
 
         Args:
