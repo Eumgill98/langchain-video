@@ -273,26 +273,3 @@ class HuggingFaceMultiModalEmbeddings(BaseModel, Embeddings):
             List of embeddings, one for each image.
         """
         return self.embed_image(images)
-    
-
-# Test Code
-if __name__ == "__main__":
-    # 초기화
-    hf = HuggingFaceMultiModalEmbeddings(
-        model_name="sentence-transformers/clip-ViT-B-32",
-        model_kwargs={'device': 'cuda'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
-  
-    # 각 모달리티별 임베딩
-    text_emb = hf.embed_query("your_text_description")
-    image_emb = hf.embed_image("your_image")
-
-    # ndarray 변환
-    text_emb = np.array(text_emb).reshape(1, -1)
-    image_emb = np.array(image_emb).reshape(1, -1)
-
-    from sklearn.metrics.pairwise import cosine_similarity
-
-    # 코사인 유사도 계산
-    print(cosine_similarity(text_emb, image_emb))
