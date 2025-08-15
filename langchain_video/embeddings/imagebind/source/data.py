@@ -12,7 +12,7 @@ from importlib import resources
 import torch
 import torch.nn as nn
 import torchaudio
-# from PIL import Image
+
 from pytorchvideo import transforms as pv_transforms
 from pytorchvideo.data.clip_sampling import ConstantClipsPerVideoSampler
 from pytorchvideo.data.encoded_video import EncodedVideo
@@ -81,36 +81,8 @@ def get_clip_timepoints(clip_sampler, duration):
     return all_clips_timepoints
 
 
-# Original Code
-# def load_and_transform_vision_data(image_paths, device):
-#     if image_paths is None:
-#         return None
-
-#     image_outputs = []
-
-#     data_transform = transforms.Compose(
-#         [
-#             transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
-#             transforms.CenterCrop(224),
-#             transforms.ToTensor(),
-#             transforms.Normalize(
-#                 mean=(0.48145466, 0.4578275, 0.40821073),
-#                 std=(0.26862954, 0.26130258, 0.27577711),
-#             ),
-#         ]
-#     )
-
-#     for image_path in image_paths:
-#         with open(image_path, "rb") as fopen:
-#             image = Image.open(fopen).convert("RGB")
-
-#         image = data_transform(image).to(device)
-#         image_outputs.append(image)
-#     return torch.stack(image_outputs, dim=0)
-
-# Custom Code
-def load_and_transform_vision_data(images, device):
-    image_outputs = []
+def transform_vision_data(images, device):
+    """applying transformation to single or multiple images. """
     data_transform = transforms.Compose(
         [
             transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
@@ -123,6 +95,7 @@ def load_and_transform_vision_data(images, device):
         ]
     )
 
+    image_outputs = []
     for image in images:
         image = data_transform(image).to(device)
         image_outputs.append(image)
@@ -130,78 +103,19 @@ def load_and_transform_vision_data(images, device):
     return torch.stack(image_outputs, dim=0)
 
 
-def load_and_transform_text(text, device):
-    if text is None:
-        return None
+def transform_text_data(text, device):
+    """applying transformation to single or multiple texts."""
     tokenizer = SimpleTokenizer(bpe_path=return_bpe_path())
     tokens = [tokenizer(t).unsqueeze(0).to(device) for t in text]
     tokens = torch.cat(tokens, dim=0)
     return tokens
 
 
-# Original Code
-# def load_and_transform_audio_data(
-#     audio_paths,
-#     device,
-#     num_mel_bins=128,
-#     target_length=204,
-#     sample_rate=16000,
-#     clip_duration=2,
-#     clips_per_video=3,
-#     mean=-4.268,
-#     std=9.138,
-# ):
-#     if audio_paths is None:
-#         return None
-
-#     audio_outputs = []
-#     clip_sampler = ConstantClipsPerVideoSampler(
-#         clip_duration=clip_duration, clips_per_video=clips_per_video
-#     )
-
-#     for audio_path in audio_paths:
-#         waveform, sr = torchaudio.load(audio_path)
-#         if sample_rate != sr:
-#             waveform = torchaudio.functional.resample(
-#                 waveform, orig_freq=sr, new_freq=sample_rate
-#             )
-#         all_clips_timepoints = get_clip_timepoints(
-#             clip_sampler, waveform.size(1) / sample_rate
-#         )
-#         all_clips = []
-#         for clip_timepoints in all_clips_timepoints:
-#             waveform_clip = waveform[
-#                 :,
-#                 int(clip_timepoints[0] * sample_rate) : int(
-#                     clip_timepoints[1] * sample_rate
-#                 ),
-#             ]
-#             waveform_melspec = waveform2melspec(
-#                 waveform_clip, sample_rate, num_mel_bins, target_length
-#             )
-#             all_clips.append(waveform_melspec)
-
-#         normalize = transforms.Normalize(mean=mean, std=std)
-#         all_clips = [normalize(ac).to(device) for ac in all_clips]
-
-#         all_clips = torch.stack(all_clips, dim=0)
-#         audio_outputs.append(all_clips)
-
-#     return torch.stack(audio_outputs, dim=0)
-
-
-# Custom Code
-def load_and_transform_audio_data(
-    audios,
-    device,
-    num_mel_bins=128,
-    target_length=204,
-    sample_rate=16000,
-    clip_duration=2,
-    clips_per_video=3,
-    mean=-4.268,
-    std=9.138,
-):
+def transform_audio_data(audios, device, num_mel_bins=128,
+                         target_length=204, sample_rate=16000,
+                         clip_duration=2, clips_per_video=3,
+                         mean=-4.268, std=9.138,):
+    """applying transformation to single or multiple audios."""
     audio_outputs = []
     clip_sampler = ConstantClipsPerVideoSampler(
         clip_duration=clip_duration, clips_per_video=clips_per_video
