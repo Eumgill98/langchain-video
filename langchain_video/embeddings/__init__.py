@@ -1,0 +1,1 @@
+from .imagebind.imagebind import ImageBindEmbeddings

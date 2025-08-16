@@ -4,7 +4,6 @@ from typing import List, Any
 
 from langchain_core.runnables.config import run_in_executor
 
-
 class TextEmbeddings(ABC):
     """
     This is an interface meant for implementing text embedding models.

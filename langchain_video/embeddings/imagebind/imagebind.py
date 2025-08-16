@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torchaudio
 
-from langchain_video.core.embeddings.base import TextEmbeddings, ImageEmbeddings, AudioEmbeddings
+from langchain_video.core.embeddings import TextEmbeddings, ImageEmbeddings, AudioEmbeddings
 
 from langchain_video.embeddings.imagebind.source import data
 from langchain_video.embeddings.imagebind.source.models import imagebind_model

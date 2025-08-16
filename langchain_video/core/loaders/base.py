@@ -4,10 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Union, List
 from pathlib import Path
 
-from langchain_video.core.blobs import VideoBlob, ImageBlob, AudioBlob, PathLike
+from langchain_video.core.blobs import PathLike, MultiModalBlob
 from collections.abc import Iterable
-
-MultiModalBlob = Union[VideoBlob, ImageBlob, AudioBlob]
 
 class BaseMultiModalBlobLoader(ABC):
     """Abstact interface for Multimodal blobs loaders implementation.
