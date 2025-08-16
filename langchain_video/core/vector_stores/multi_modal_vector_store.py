@@ -6,18 +6,19 @@ from langchain_video.core.blobs import MultiModalBlob
 from langchain_video.core.embeddings import MultiModalEmbeddings
 
 from langchain_core.vectorstores import VectorStore
-
+from tqdm import tqdm
 import numpy as np
 
 class MultiModalVectorStore:
     def __init__(
         self,
         embedding: MultiModalEmbeddings,
-        vector_store: VectorStore
+        vector_store: VectorStore,
+
     ):
         self.embedding = embedding
         self.vector_store = vector_store
-
+    
     def _embed_blob(
         self,
         blob: MultiModalBlob,
@@ -26,7 +27,7 @@ class MultiModalVectorStore:
         if isinstance(blob, AudioBlob):
             return (self.embedding.embed_query_audio(blob.as_audio()))
         elif isinstance(blob, VideoBlob):
-            return (self.embedding.embed_videos(blob.as_frames()))
+            return (self.embedding.embed_query_video(blob.as_frames())[1])
         elif isinstance(blob, ImageBlob):
             return (self.embedding.embed_query_image(blob.as_image()))
         return None
@@ -90,7 +91,7 @@ class MultiModalVectorStore:
         vectors = []
         metadatas = []
 
-        for blob in blobs:
+        for blob in tqdm(blobs):
             embed = self._embed_blob(blob)
             if embed is not None:
                 vectors.append(embed)
@@ -101,7 +102,7 @@ class MultiModalVectorStore:
             self.vector_store.add_vectors(vectors=vectors, metadatas=metadatas)
         elif hasattr(self.vector_store, "add_texts"):
             dummy_texts = ["[MultiModal Embedding]" for _ in vectors]
-            self.vector_store.add_texts(dummy_texts, metadatas=metadatas, embeddings=vectors)
+            self.vector_store.add_texts(texts=dummy_texts, metadatas=metadatas, embeddings=vectors)
         else:
             raise NotImplementedError(f"This Vector Store does not support vector addition")
                 

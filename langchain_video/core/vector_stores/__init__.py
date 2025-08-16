@@ -1,0 +1,1 @@
+from .multi_modal_vector_store import MultiModalVectorStore
