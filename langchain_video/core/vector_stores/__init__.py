@@ -1,1 +1,2 @@
-from .multi_modal_vector_store import MultiModalVectorStore
+from .base import MultiModalVectorStore
+from .multi_modal_faiss import MultiModalFAISS
