@@ -3,9 +3,11 @@ from __future__ import annotations
 import uuid
 import numpy as np
 import pickle
+import torch
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from pathlib import Path
+from tqdm import tqdm
 
 from langchain.docstore.base import Docstore
 from langchain.docstore.document import Document
@@ -47,7 +49,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         relevance_score_fn: Optional[Callable[[float], float]] = None,
         normalize_L2: bool = False,
         distance_strategy: str = "EUCLIDEAN_DISTANCE",
-        resampler=None,
+        resampler = None,
         **kwargs: Any,
     ):
         """Initialize with necessary components."""
@@ -130,8 +132,8 @@ class MultiModalFAISS(MultiModalVectorStore):
             metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
             metadata.update({
                 "content_type": "image",
-                "image_path": getattr(img, 'path', None),
-                "image_format": getattr(img, 'mimetype', None)
+                "path": getattr(img, 'path', None),
+                "format": getattr(img, 'mimetype', None)
             })
             page_content = f"[IMAGE:{getattr(img, 'path', f'image_{i}')}]"
             doc = Document(page_content=page_content, metadata=metadata)
@@ -144,17 +146,22 @@ class MultiModalFAISS(MultiModalVectorStore):
         videos: List[VideoBlob],
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
+        func: Callable=torch.mean,
+        dim: int = 0,
         **kwargs: Any,
     ) -> List[str]:
         """Add videos to the vectorstore."""
+
+        verbose = kwargs.get('verbose', False)
+        video_iterator = tqdm(videos, desc="Video Embedding Process", disable=not verbose) if verbose else videos
         embeddings = []
-        for vid in videos:
+        for vid in video_iterator:
             frames = vid.as_frames()
             
             if self.resampler is not None:
                 frames = self.resampler(frames)
             
-            embedding = self.embedding_function.embed_query_video(frames)
+            embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim)
             embeddings.append(embedding)
 
         documents = []
@@ -162,8 +169,8 @@ class MultiModalFAISS(MultiModalVectorStore):
             metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
             metadata.update({
                 "content_type": "video",
-                "video_path": getattr(vid, 'path', None),
-                "video_format": getattr(vid, 'mimetype', None),
+                "path": getattr(vid, 'path', None),
+                "format": getattr(vid, 'mimetype', None),
                 "start_frame": getattr(vid, 'start_frame', None),
                 "end_frame": getattr(vid, 'end_frame', None)
             })
@@ -188,8 +195,8 @@ class MultiModalFAISS(MultiModalVectorStore):
             metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
             metadata.update({
                 "content_type": "audio",
-                "audio_path": getattr(audio, 'path', None),
-                "audio_format": getattr(audio, 'mimetype', None),
+                "path": getattr(audio, 'path', None),
+                "format": getattr(audio, 'mimetype', None),
                 "start_sample": getattr(audio, 'start_sample', None),
                 "end_sample": getattr(audio, 'end_sample', None)
             })
@@ -210,7 +217,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         """Search for similar documents with scores."""
         if self.index.ntotal == 0:
             return []
-        
+
         query_embedding_np = np.array([query_embedding], dtype=np.float32)
         
         if self.normalize_L2:
@@ -256,6 +263,8 @@ class MultiModalFAISS(MultiModalVectorStore):
     ) -> List[Document]:
         """Search for similar documents using text query."""
         query_embedding = self.embedding_function.embed_query_text(query)
+        print(query_embedding)
+        print(len(query_embedding))
         docs_and_scores = self.__search(query_embedding, k, filter, fetch_k, **kwargs)
         return [doc for doc, _ in docs_and_scores]
     
@@ -294,6 +303,8 @@ class MultiModalFAISS(MultiModalVectorStore):
         k: int = 4,
         filter: Optional[Dict[str, Any]] = None,
         fetch_k: int = 20,
+        func: Callable = torch.mean,
+        dim: int = 0,
         **kwargs: Any,
     ) -> List[Document]:
         """Search for similar content using video query."""
@@ -305,7 +316,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         if self.resampler is not None:
             frames = self.resampler(frames)
         
-        query_embedding = self.embedding_function.embed_query_video(frames)
+        query_embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim)
         docs_and_scores = self.__search(query_embedding, k, filter, fetch_k, **kwargs)
         return [doc for doc, _ in docs_and_scores]
 
@@ -438,9 +449,8 @@ class MultiModalFAISS(MultiModalVectorStore):
         """Construct FAISS wrapper from raw documents."""
         faiss = dependable_faiss_import()
         
-        embeddings = [embedding.embed_query_text(text) for text in texts]
-        
-        index = faiss.IndexFlatL2(len(embeddings[0]))
+        text_vector = embedding.embed_query_text(texts[0])
+        index = faiss.IndexFlatL2(len(text_vector))
         
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
@@ -468,9 +478,8 @@ class MultiModalFAISS(MultiModalVectorStore):
         """Construct FAISS wrapper from images."""
         faiss = dependable_faiss_import()
         
-        embeddings = [embedding.embed_query_image(img.as_image()) for img in images]
-        
-        index = faiss.IndexFlatL2(len(embeddings[0]))
+        image_vector = embedding.embed_query_image(images[0].as_image())
+        index = faiss.IndexFlatL2(len(image_vector))
         
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
@@ -493,21 +502,21 @@ class MultiModalFAISS(MultiModalVectorStore):
         embedding: MultiModalEmbeddings,
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
-        resampler=None,
+        resampler = None,
+        func: Callable = torch.mean,
+        dim: int = 0,
         **kwargs: Any,
     ) -> MultiModalFAISS:
         """Construct FAISS wrapper from videos."""
         faiss = dependable_faiss_import()
         
-        embeddings = []
-        for vid in videos:
-            frames = vid.as_frame()
-            if resampler is not None:
-                frames = resampler(frames)
-            embedding_vec = embedding.embed_query_video(frames)
-            embeddings.append(embedding_vec)
-        
-        index = faiss.IndexFlatL2(len(embeddings[0]))
+        frames = videos[0].as_frames()
+        if resampler is not None:
+            frames = resampler(frames)
+        video_vec = embedding.embed_query_video(frames, func=func, dim=dim)
+        index = faiss.IndexFlatL2(len(video_vec))
+
+        print(f"Len of Embedding : [{len(video_vec)}]")
         
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
@@ -521,7 +530,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             **kwargs,
         )
 
-        vecstore.add_videos(videos, metadatas=metadatas, ids=ids)
+        vecstore.add_videos(videos, metadatas=metadatas, ids=ids, func=func, dim=dim, **kwargs)
         return vecstore
 
     @classmethod
@@ -536,9 +545,8 @@ class MultiModalFAISS(MultiModalVectorStore):
         """Construct FAISS wrapper from audios."""
         faiss = dependable_faiss_import()
         
-        embeddings = [embedding.embed_query_audio(audio.as_audio()) for audio in audios]
-        
-        index = faiss.IndexFlatL2(len(embeddings[0]))
+        audio_vector = embedding.embed_query_audio(audios[0].as_audio())
+        index = faiss.IndexFlatL2(len(audio_vector))
 
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
