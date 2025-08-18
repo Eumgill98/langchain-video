@@ -75,7 +75,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             return []
         
         embeddings_np = np.array(embeddings, dtype=np.float32)
-        
+
         if self.normalize_L2:
             faiss.normalize_L2(embeddings_np)
 
@@ -126,7 +126,12 @@ class MultiModalFAISS(MultiModalVectorStore):
         **kwargs: Any,
     ) -> List[str]:
         """Add images to the vectorstore."""
-        embeddings = [self.embedding_function.embed_query_image(img.as_iamges()) for img in images]
+        verbose = kwargs.get('verbose', False)
+        iterator = tqdm(images, desc="Image Embedding Process", disable=not verbose) if verbose else images
+        embeddings = []
+
+        for img in iterator:
+            embeddings.append(self.embedding_function.embed_query_image(img.as_image()))
 
         documents = []
         for i, img in enumerate(images):
@@ -153,11 +158,10 @@ class MultiModalFAISS(MultiModalVectorStore):
         **kwargs: Any,
     ) -> List[str]:
         """Add videos to the vectorstore."""
-
         verbose = kwargs.get('verbose', False)
-        video_iterator = tqdm(videos, desc="Video Embedding Process", disable=not verbose) if verbose else videos
+        iterator = tqdm(videos, desc="Video Embedding Process", disable=not verbose) if verbose else videos
         embeddings = []
-        for vid in video_iterator:
+        for vid in iterator:
             frames = vid.as_frames()
             
             if self.resampler is not None:
@@ -190,7 +194,12 @@ class MultiModalFAISS(MultiModalVectorStore):
         **kwargs: Any,
     ) -> List[str]:
         """Add audios to the vectorstore."""
-        embeddings = [self.embedding_function.embed_query_audio(audio) for audio in audios]
+        verbose = kwargs.get('verbose', False)
+        iterator = tqdm(audios, desc="Audio Embedding Process", disable=not verbose) if verbose else audios
+    
+        embeddings = []
+        for audio in iterator:
+            embeddings.append(self.embedding_function.embed_query_audio(audio.as_audio()))
 
         documents = []
         for i, audio in enumerate(audios):
@@ -452,6 +461,9 @@ class MultiModalFAISS(MultiModalVectorStore):
         
         text_vector = embedding.embed_query_text(texts[0])
         index = faiss.IndexFlatL2(len(text_vector))
+
+        print(f"Len of Embedding : [{len(text_vector)}]")
+
         
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
@@ -464,7 +476,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             **kwargs,
         )
 
-        vecstore.add_texts(texts, metadatas=metadatas, ids=ids)
+        vecstore.add_texts(texts, metadatas=metadatas, ids=ids, **kwargs)
         return vecstore
 
     @classmethod
@@ -482,6 +494,9 @@ class MultiModalFAISS(MultiModalVectorStore):
         image_vector = embedding.embed_query_image(images[0].as_image())
         index = faiss.IndexFlatL2(len(image_vector))
         
+        print(f"Len of Embedding : [{len(image_vector)}]")
+
+        
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
 
@@ -493,7 +508,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             **kwargs,
         )
 
-        vecstore.add_images(images, metadatas=metadatas, ids=ids)
+        vecstore.add_images(images, metadatas=metadatas, ids=ids, **kwargs)
         return vecstore
 
     @classmethod
@@ -546,9 +561,11 @@ class MultiModalFAISS(MultiModalVectorStore):
     ) -> MultiModalFAISS:
         """Construct FAISS wrapper from audios."""
         faiss = dependable_faiss_import()
-        
+    
         audio_vector = embedding.embed_query_audio(audios[0].as_audio())
         index = faiss.IndexFlatL2(len(audio_vector))
+
+        print(f"Len of Embedding : [{len(audio_vector)}]")
 
         docstore = InMemoryDocstore()
         index_to_docstore_id = {}
@@ -561,5 +578,5 @@ class MultiModalFAISS(MultiModalVectorStore):
             **kwargs,
         )
 
-        vecstore.add_audios(audios, metadatas=metadatas, ids=ids)
+        vecstore.add_audios(audios, metadatas=metadatas, ids=ids, **kwargs)
         return vecstore

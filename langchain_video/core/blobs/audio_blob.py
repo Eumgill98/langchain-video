@@ -1,7 +1,7 @@
 from __future__ import annotations
 from .base import PathLike
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
 from pydantic import ConfigDict
 from langchain_core.documents.base import BaseMedia
@@ -70,7 +70,7 @@ class AudioBlob(BaseMedia):
         except Exception as e:
             raise RuntimeError(f"Failed to load audio metadata: {e}")
         
-    def as_audio(self, mono: bool = False) -> np.ndarray:
+    def as_audio(self, mono: bool = False) -> Tuple[np.ndarray, int]:
         """Get audio data as numpy array.
 
         Args:
@@ -83,32 +83,34 @@ class AudioBlob(BaseMedia):
         """
         if self.data is not None:
             audio = self.data.copy()
+            sr = self.sample_rate
 
             if mono and audio.ndim > 1:
                 audio = np.mean(audio, axis=1)
             
-            return audio
+            return audio, sr
         
         if self.path is None:
             raise ValueError("Cannot extract audio: no audio data or path available")
 
         if self.subclip:
-            return self._extract_audio_from_file(mono)[self.start_sample:self.end_sample]
+            audio, sr = self._extract_audio_from_file(mono)
+            return audio[self.start_sample:self.end_sample], sr
 
         return self._extract_audio_from_file(mono)
     
-    def _extract_audio_from_file(self, mono: bool = False) -> np.ndarray:
-        """Extract audio from file using soundfile with original sample rate"""
+    def _extract_audio_from_file(self, mono: bool = False) -> Tuple[np.ndarray, int]:
+        """Extract audio and return (array, sample_rate)."""
         try:
             audio, sr = sf.read(str(self.path), dtype='float32')
             
             if mono and audio.ndim > 1:
                 audio = np.mean(audio, axis=1)
             
-            return audio
-            
+            return audio, sr
         except Exception as e:
             raise RuntimeError(f"Audio extraction failed: {e}")
+
 
     def get_audio_info(self) -> Dict[str, Any]:
         """Get audio information as a dictionary"""
