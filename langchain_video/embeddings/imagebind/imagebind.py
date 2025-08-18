@@ -145,9 +145,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embeddings
         with torch.no_grad():
-            embeddings = self._client(documents)
+            embeddings = self._client(documents)[ModalityType.TEXT]
         
-        return embeddings[ModalityType.TEXT].tolist()
+        return embeddings.tolist()
 
     def embed_query_text(self, text: str) -> List[float]:
         """Embed query text.
@@ -169,9 +169,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embedding
         with torch.no_grad():
-            embedding = self._client(query_text)
+            embedding = self._client(query_text)[ModalityType.TEXT]
         
-        return embedding[ModalityType.TEXT].tolist()
+        return embedding.tolist()[0]
 
     def embed_images(self, images: Any) -> List[List[float]]:
         """Embed multiple images.
@@ -192,9 +192,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embeddings
         with torch.no_grad():
-            embeddings = self._client(input_images)
+            embeddings = self._client(input_images)[ModalityType.VISION]
         
-        return embeddings[ModalityType.VISION].tolist()
+        return embeddings.tolist()
 
     def embed_query_image(self, image: Any) -> List[float]:
         """Embed query image.
@@ -215,9 +215,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embedding
         with torch.no_grad():
-            embedding = self._client(query_image)
+            embedding = self._client(query_image)[ModalityType.VISION]
         
-        return embedding[ModalityType.VISION].tolist()
+        return embedding.tolist()[0]
 
     def embed_audios(self, audios: Any) -> List[List[float]]:
         """Embed multiple audios.
@@ -238,9 +238,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embeddings
         with torch.no_grad():
-            embeddings = self._client(input_audios)
+            embeddings = self._client(input_audios)[ModalityType.AUDIO]
         
-        return embeddings[ModalityType.AUDIO].tolist()
+        return embeddings.tolist()
 
     def embed_query_audio(self, audio: Any) -> List[float]:
         """Embed query audio.
@@ -261,9 +261,9 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
 
         # make embedding
         with torch.no_grad():
-            embedding = self._client(query_audio)
+            embedding = self._client(query_audio)[ModalityType.AUDIO]
         
-        return embedding[ModalityType.AUDIO].tolist()
+        return embedding.tolist()[0]
     
     def embed_videos(self, videos: Any, func: Callable=torch.mean, **func_kwargs: dict) -> List[List[float]]:
         """Embed multiple videos.
@@ -306,4 +306,4 @@ class ImageBindEmbeddings(TextEmbeddings, ImageEmbeddings, AudioEmbeddings):
         # applying callable method (default: torch.mean)
         embedding = func(embedding, **func_kwargs)
         
-        return embedding.tolist()
+        return embedding.tolist()[0]
