@@ -149,6 +149,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         ids: Optional[List[str]] = None,
         func: Callable=torch.mean,
         dim: int = 0,
+        keepdim: bool = True,
         **kwargs: Any,
     ) -> List[str]:
         """Add videos to the vectorstore."""
@@ -162,7 +163,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             if self.resampler is not None:
                 frames = self.resampler(frames)
             
-            embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim)
+            embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim, keepdim=keepdim)
             embeddings.append(embedding)
 
         documents = []
@@ -264,8 +265,6 @@ class MultiModalFAISS(MultiModalVectorStore):
     ) -> List[Document]:
         """Search for similar documents using text query."""
         query_embedding = self.embedding_function.embed_query_text(query)
-        print(query_embedding)
-        print(len(query_embedding))
         docs_and_scores = self.__search(query_embedding, k, filter, fetch_k, **kwargs)
         return [doc for doc, _ in docs_and_scores]
     
@@ -306,6 +305,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         fetch_k: int = 20,
         func: Callable = torch.mean,
         dim: int = 0,
+        keepdim: bool = True,
         **kwargs: Any,
     ) -> List[Document]:
         """Search for similar content using video query."""
@@ -317,7 +317,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         if self.resampler is not None:
             frames = self.resampler(frames)
         
-        query_embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim)
+        query_embedding = self.embedding_function.embed_query_video(frames, func=func, dim=dim, keepdim=keepdim)
         docs_and_scores = self.__search(query_embedding, k, filter, fetch_k, **kwargs)
         return [doc for doc, _ in docs_and_scores]
 
@@ -506,6 +506,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         resampler: VideoResampler = None,
         func: Callable = torch.mean,
         dim: int = 0,
+        keepdim: bool = True,
         **kwargs: Any,
     ) -> MultiModalFAISS:
         """Construct FAISS wrapper from videos."""
@@ -514,7 +515,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         frames = videos[0].as_frames()
         if resampler is not None:
             frames = resampler(frames)
-        video_vec = embedding.embed_query_video(frames, func=func, dim=dim)
+        video_vec = embedding.embed_query_video(frames, func=func, dim=dim, keepdim=keepdim)
         index = faiss.IndexFlatL2(len(video_vec))
 
         print(f"Len of Embedding : [{len(video_vec)}]")
@@ -531,7 +532,7 @@ class MultiModalFAISS(MultiModalVectorStore):
             **kwargs,
         )
 
-        vecstore.add_videos(videos, metadatas=metadatas, ids=ids, func=func, dim=dim, **kwargs)
+        vecstore.add_videos(videos, metadatas=metadatas, ids=ids, func=func, dim=dim, keepdim=keepdim, **kwargs)
         return vecstore
 
     @classmethod
