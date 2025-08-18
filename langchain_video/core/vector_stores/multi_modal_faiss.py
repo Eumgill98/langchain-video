@@ -15,6 +15,7 @@ from langchain.docstore.in_memory import InMemoryDocstore
 from langchain.vectorstores.utils import maximal_marginal_relevance
 from langchain_video.core.blobs import ImageBlob, VideoBlob, AudioBlob
 from langchain_video.core.embeddings import MultiModalEmbeddings
+from langchain_video.core.resamplers import VideoResampler
 
 from .base import MultiModalVectorStore
 
@@ -49,7 +50,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         relevance_score_fn: Optional[Callable[[float], float]] = None,
         normalize_L2: bool = False,
         distance_strategy: str = "EUCLIDEAN_DISTANCE",
-        resampler = None,
+        resampler:VideoResampler = None,
         **kwargs: Any,
     ):
         """Initialize with necessary components."""
@@ -502,7 +503,7 @@ class MultiModalFAISS(MultiModalVectorStore):
         embedding: MultiModalEmbeddings,
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
-        resampler = None,
+        resampler: VideoResampler = None,
         func: Callable = torch.mean,
         dim: int = 0,
         **kwargs: Any,

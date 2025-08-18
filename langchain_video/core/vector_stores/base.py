@@ -7,12 +7,13 @@ from langchain_core.vectorstores import VectorStore
 from langchain.docstore.document import Document
 from langchain_video.core.blobs import ImageBlob, VideoBlob, AudioBlob, MultiModalBlob
 from langchain_video.core.embeddings import MultiModalEmbeddings
+from langchain_video.core.resamplers import VideoResampler
 
 import numpy as np
 
 class MultiModalVectorStore(VectorStore):
     """nterface for multimodal vector store."""
-    def __init__(self, embedding_function:MultiModalEmbeddings, resampler = None, **kwargs):
+    def __init__(self, embedding_function:MultiModalEmbeddings, resampler: VideoResampler = None, **kwargs):
         super().__init__()
         self.embedding_function = embedding_function
         self.resampler = resampler
