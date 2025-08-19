@@ -49,3 +49,6 @@ Homepage = "https://github.com/Eumgill98/langchain-video"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["langchain_video*"]
+
+[tool.setuptools.package-data]
+"langchain_video.embeddings.imagebind" = ["source/bpe/*.txt.gz"]
