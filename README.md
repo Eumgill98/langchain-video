@@ -1,4 +1,5 @@
 # 🎬 langchain-video
+<img src="./resource/logo.png" alt="logo" width="200" >
 
 **`langchain-video`** is a LangChain-based library for **multimodal data processing**, enabling video, image, and audio embedding, storage, and retrieval. Seamlessly integrate with LangChain RAG pipelines or other LLM workflows.  
 
